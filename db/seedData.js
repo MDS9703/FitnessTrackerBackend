@@ -29,21 +29,10 @@ async function createTables() {
       username VARCHAR(255) UNIQUE NOT NULL,
       password VARCHAR(255) NOT NULL
     );
-    CREATE TABLE IF NOT EXISTS table1
-      id SERIAL PRIMARY KEY,
-      column1 VARCHAR(255) NOT NULL,
-      column2 VARCHAR(255) NOT NULL
-    );
-    CREATE TABLE IF NOT EXISTS table2 (
-      id SREIAL PRIMARY KEY,
-      column1 VARCHAR(255) NOT NULL,
-      column2 VARCHAR(255) NOT NULL,
-      column3 VARCHAR(255) NOT NULL,
-    );
     CREATE TABLE IF NOT EXISTS routines (
-      id SERIAL PRRIMARY KEY,
-      creatorId INTEGER REFERENCES users(id),
-      isPublic BOOLEAN DEFAULT false,
+      id SERIAL PRIMARY KEY,
+      "creatorId" INTEGER REFERENCES users(id),
+      "isPublic" BOOLEAN DEFAULT false,
       name VARCHAR(255) UNIQUE NOT NULL,
       goal TEXT NOT NULL
     );
@@ -54,11 +43,11 @@ async function createTables() {
     );
     CREATE TABLE IF NOT EXISTS routine_activities (
       id SERIAL PRIMARY KEY,
-      routineId INTEGER REFERENCES routines(id),
-      activityId INTEGER REFERENCES activities(id),
-      duration INETEGER,
+      "routineId" INTEGER REFERENCES routines(id),
+      "activityId" INTEGER REFERENCES activities(id),
+      duration INTEGER,
       count INTEGER,
-      UNIQUE (routineId, activityId)
+      UNIQUE ("routineId", "activityId")
     );
     `);
     console.log("Tables created successfully.");

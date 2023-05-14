@@ -16,14 +16,19 @@ async function createActivity({ name, description }) {
 }
 
 async function getAllActivities() {
-  // select and return an array of all activities
+  const result = await client.query(`
+    SELECT id, name, description
+    FROM activities
+  `);
+
+  return result.rows;
 }
 
 async function getActivityById(id) {
   const result = await client.query(
     `
   SELECT *
-  FROM activites
+  FROM activities
   WHERE id = $1
   `,
     [id]
@@ -37,22 +42,67 @@ async function getActivityById(id) {
   }
 }
 
-async function getActivityByName(name) {}
+async function getActivityByName(name) {
+  const result = await client.query(
+    `
+    SELECT *
+    FROM activities
+    WHERE name = $1
+    `,
+    [name]
+  );
 
-// used as a helper inside db/routines.js
-async function attachActivitiesToRoutines(routines) {}
+  if (result.rows.length > 0) {
+    const { id, name, description } = result.rows[0];
+    return { id, name, description };
+  } else {
+    return null;
+  }
+}
+
+// async function attachActivitiesToRoutines(routines) {}
 
 async function updateActivity({ id, ...fields }) {
-  // don't try to update the id
-  // do update the name and description
-  // return the updated activity
+  // Extract the fields to be updated
+  const { name, description } = fields;
+
+  // Update the activity in the database
+  const result = await client.query(
+    `
+    UPDATE activities
+    SET name = $1, description = $2
+    WHERE id = $3
+    RETURNING id, name, description
+    `,
+    [name, description, id]
+  );
+
+  // Return the updated activity
+  if (result.rows.length > 0) {
+    const { id, name, description } = result.rows[0];
+    return { id, name, description };
+  } else {
+    return null;
+  }
+}
+
+async function clearActivitiesData() {
+  try {
+    await client.query("DELETE FROM activities");
+    console.log("Activities data cleared successfully.");
+  } catch (error) {
+    console.error("Error clearing activities data:", error);
+  } finally {
+    client.end();
+  }
 }
 
 module.exports = {
   getAllActivities,
   getActivityById,
   getActivityByName,
-  attachActivitiesToRoutines,
+  // attachActivitiesToRoutines,
   createActivity,
   updateActivity,
+  clearActivitiesData,
 };
