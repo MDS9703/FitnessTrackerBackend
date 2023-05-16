@@ -2,98 +2,126 @@ const client = require("./client");
 
 // database functions
 async function createActivity({ name, description }) {
-  // return the new activity
-  const result = await client.query(
-    `
-  INSERT INTO activities (name, description)
-  Values ($1, $2)
-  RETURNING id, name
-  `,
-    [name, description]
-  );
-
-  return result.rows[0];
+  try {
+    const {
+      rows: [activity],
+    } = await client.query(
+      `
+      INSERT INTO activities (name, description)
+      VALUES ($1, $2)
+      RETURNING *
+      `,
+      [name, description]
+    );
+    return activity;
+  } catch (error) {
+    throw new Error("Failed to create activity: " + error.message);
+  }
 }
 
+// return the new activity
+
 async function getAllActivities() {
-  const result = await client.query(`
-    SELECT id, name, description
+  try {
+    const { rows } = await client.query(`
+    SELECT *
     FROM activities
   `);
 
-  return result.rows;
+    return rows;
+  } catch (error) {
+    throw new Error("Failed to get all activities: " + error.message);
+  }
 }
 
 async function getActivityById(id) {
-  const result = await client.query(
-    `
+  try {
+    const {
+      rows: [activity],
+    } = await client.query(
+      `
   SELECT *
   FROM activities
   WHERE id = $1
   `,
-    [id]
-  );
+      [id]
+    );
 
-  if (result.rows.length > 0) {
-    const { id, name, description } = result.rows[0];
-    return { id, name, description };
-  } else {
-    return null;
+    return activity;
+  } catch (error) {
+    throw new Error("Failed to get activity by id: " + error.message);
   }
 }
 
 async function getActivityByName(name) {
-  const result = await client.query(
-    `
+  try {
+    const {
+      rows: [activity],
+    } = await client.query(
+      `
     SELECT *
     FROM activities
     WHERE name = $1
     `,
-    [name]
-  );
+      [name]
+    );
 
-  if (result.rows.length > 0) {
-    const { id, name, description } = result.rows[0];
-    return { id, name, description };
-  } else {
-    return null;
+    return activity;
+  } catch (error) {
+    throw new Error("Failed to get activity by name: " + error.message);
   }
 }
 
-// async function attachActivitiesToRoutines(routines) {}
+async function attachActivitiesToRoutines(routines) {
+  const returnRoutines = [...routines];
+
+  try {
+    const { rows: activities } = await client.query(`
+    SELECT activities.*, routine_activities.id AS "routineActivityId", routine_activities."routineId", routine_activities.duration, routine_activities.count
+    FROM activities
+    JOIN routine_activities ON routine_activities."activityId" = activities.id;
+    `);
+    for (const routine of returnRoutines) {
+      const activitiesToAdd = activities.filter(
+        (activity) => activity.routineId === routine.id
+      );
+      routine.activities = activitiesToAdd;
+    }
+
+    return returnRoutines;
+  } catch (error) {
+    throw new error("Failed to attach routines: " + error.message);
+  }
+}
 
 async function updateActivity({ id, ...fields }) {
-  // Extract the fields to be updated
-  const { name, description } = fields;
+  const fieldKeys = Object.keys(fields);
+  const fieldValues = Object.values(fields);
 
-  // Update the activity in the database
-  const result = await client.query(
-    `
-    UPDATE activities
-    SET name = $1, description = $2
-    WHERE id = $3
-    RETURNING id, name, description
-    `,
-    [name, description, id]
-  );
+  // Construct the SET clause for updating fields
+  const setString = fieldKeys
+    .map((key, index) => `"${key}"=$${index + 1}`)
+    .join(", ");
 
-  // Return the updated activity
-  if (result.rows.length > 0) {
-    const { id, name, description } = result.rows[0];
-    return { id, name, description };
-  } else {
-    return null;
-  }
-}
+  if (setString.length > 0) {
+    const query = {
+      text: `
+        UPDATE activities
+        SET ${setString}
+        WHERE id=$${fieldKeys.length + 1}
+        RETURNING *;
+      `,
+      values: [...fieldValues, id],
+    };
 
-async function clearActivitiesData() {
-  try {
-    await client.query("DELETE FROM activities");
-    console.log("Activities data cleared successfully.");
-  } catch (error) {
-    console.error("Error clearing activities data:", error);
-  } finally {
-    client.end();
+    try {
+      const {
+        rows: [activity],
+      } = await client.query(query);
+      return activity;
+    } catch (error) {
+      throw new Error("Failed to update activity: " + error.message);
+    }
   }
 }
 
@@ -101,8 +129,7 @@ module.exports = {
   getAllActivities,
   getActivityById,
   getActivityByName,
-  // attachActivitiesToRoutines,
+  attachActivitiesToRoutines,
   createActivity,
-  updateActivity,
-  clearActivitiesData,
+  updateActivity
 };

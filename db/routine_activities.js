@@ -6,13 +6,22 @@ async function addActivityToRoutine({
   count,
   duration,
 }) {
-  const result = await client.query(`
-  INSERT INTO routine_activites (routineId, activityId, count, duration)
-  Values ($1, $2, $3, $4,)
-  RETURNING *
-  `, [routineId, activityId, count, duration]);
-
-  return result.rows[0];
+  try {
+    const {
+      rows: [routineActivity],
+    } = await client.query(
+      `
+    INSERT INTO routine_activities ("routineId", "activityId", count, duration)
+    VALUES ($1, $2, $3, $4)
+    ON CONFLICT ("routineId", "activityId") DO NOTHING
+    RETURNING *;
+    `,
+      [routineId, activityId, count, duration]
+    );
+    return routineActivity;
+  } catch (error) {
+    throw new error;
+  }
 }
 
 async function getRoutineActivityById(id) {
