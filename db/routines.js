@@ -12,114 +12,146 @@ async function createRoutine({ creatorId, isPublic, name, goal }) {
 
 async function getRoutineById(id) {
   try {
-    const routine = await Routine.findById(id);
-
-    if (!routine) {
-      throw new Error('Routine not found');
-    }
+    const { rows: [ routine ] } = await client.query(
+      `SELECT *
+      FROM routines
+      WHERE id=$1;`
+    , [id]);
 
     return routine;
   } catch (error) {
-    throw new Error(`Failed to get routine with ID ${id}: ${error.message}`);
+    console.error(error);
   }
 }
 
 async function getRoutinesWithoutActivities() {
   try {
-    const routines = await Routine.find({ activities: { $exists: false } });
-
-    return routines;
+    const { rows } = await client.query(
+      `SELECT *
+      FROM routines;`
+    );
+    return rows;
   } catch (error) {
-    throw new Error(`Failed to get routines without activities: ${error.message}`);
+    console.error(error);
   }
 }
 
 async function getAllRoutines() {
   try {
-    const routines = await Routine.find().populate('activities');
+    const { rows } = await client.query(
+      `SELECT routines.*, users.username AS "creatorName"
+      FROM routines
+      JOIN users ON routines."creatorId"=users.id;`
+    );
 
-    return routines;
+    return attachActivitiesToRoutines(rows);
   } catch (error) {
-    throw new Error(`Failed to get all routines: ${error.message}`);
+    console.error(error);
   }
 }
 
 async function getAllPublicRoutines() {
   try {
-    const routines = await Routine.find({ isPublic: true }).populate('activities');
-
-    return routines;
+    const { rows } = await client.query(
+      `SELECT routines.*, users.username AS "creatorName"
+      FROM routines
+      JOIN users ON routines."creatorId"=users.id
+      WHERE "isPublic"=true;`
+    );
+  
+    return attachActivitiesToRoutines(rows);
   } catch (error) {
-    throw new Error(`Failed to get all public routines: ${error.message}`);
+    console.error(error);
   }
 }
 
 async function getAllRoutinesByUser({ username }) {
   try {
-    const routines = await Routine.find({ username }).populate('activities');
-
-    return routines;
+    const { rows } = await client.query(
+      `SELECT routines.*, users.username AS "creatorName"
+      FROM routines
+      JOIN users ON routines."creatorId"=users.id
+      WHERE "username"=$1;`
+    , [username]);
+  
+    return attachActivitiesToRoutines(rows);
   } catch (error) {
-    throw new Error(`Failed to get routines for user ${username}: ${error.message}`);
+    console.error(error);
   }
 }
 
 async function getPublicRoutinesByUser({ username }) {
   try {
-    const routines = await Routine.find({ username, isPublic: true }).populate('activities');
-
-    return routines;
+    const { rows } = await client.query(
+      `SELECT routines.*, users.username AS "creatorName"
+      FROM routines
+      JOIN users ON routines."creatorId"=users.id
+      WHERE "username"=$1 AND "isPublic"=true;`
+    , [username]);
+  
+    return attachActivitiesToRoutines(rows);
   } catch (error) {
-    throw new Error(`Failed to get public routines for user ${username}: ${error.message}`);
+    console.error(error);
   }
 }
 
 async function getPublicRoutinesByActivity({ id }) {
   try {
-    const routines = await Routine.find({ activity: id, isPublic: true }).populate('activities');
-
-    if (!routines) {
-      throw new Error(`No public routines found for activity with ID ${id}`);
-    }
-
-    return routines;
+    const { rows } = await client.query(
+      `SELECT routines.*, users.username AS "creatorName"
+      FROM routines
+      JOIN users ON routines."creatorId"=users.id
+      WHERE "isPublic"=true AND routines.id IN
+      (SELECT "routineId" FROM routine_activities WHERE "activityId"=${id});`
+    );
+  
+    return attachActivitiesToRoutines(rows);
   } catch (error) {
-    throw new Error(`Failed to get public routines for activity with ID ${id}: ${error.message}`);
+    console.error(error);
   }
 }
 
 async function updateRoutine({ id, ...fields }) {
+  const setString = Object.keys(fields).map(
+    (key, index) => `"${ key }"=$${ index + 1 }`
+  ).join(', ');
+
+  if (setString.length === 0) {
+    return;
+  }
+
   try {
-    const routine = await Routine.findById(id).populate('activities');
+    const { rows: [ routine ] } = await client.query(
+      `UPDATE routines
+      SET ${ setString }
+      WHERE id=${ id }
+      RETURNING *;`
+    , Object.values(fields));
 
-    if (!routine) {
-      throw new Error(`Routine not found with ID ${id}`);
-    }
-
-    Object.assign(routine, fields);
-
-    const updatedRoutine = await routine.save();
-
-    return updatedRoutine.populate('activities');
+    return routine;
   } catch (error) {
-    throw new Error(`Failed to update routine with ID ${id}: ${error.message}`);
+    console.error(error);
   }
 }
 
 async function destroyRoutine(id) {
   try {
-    const routine = await Routine.findById(id).populate('activities');
+    await client.query(
+      `DELETE 
+      FROM routine_activities
+      WHERE "routineId"=$1;`
+    , [id]);
 
-    if (!routine) {
-      throw new Error('Routine not found');
-    }
-
-    await Routine.deleteOne({ _id: id });
-
-    const allRoutines = await Routine.find().populate('activities');
-    return allRoutines;
+    const { rows } = await client.query(
+      `DELETE 
+      FROM routines
+      WHERE id=$1
+      RETURNING *;`
+    , [id]);
+      
+    return rows;
   } catch (error) {
-    throw new Error(`Failed to destroy routine with ID ${id}: ${error.message}`);
+    console.error(error);
   }
 }
 
