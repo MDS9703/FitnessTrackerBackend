@@ -1,5 +1,25 @@
 const client = require("./client");
 
+
+async function getRoutineActivityById(id) {
+  try {
+    const {
+      rows: [routineActivity],
+    } = await client.query(
+      `
+    SELECT * 
+    FROM routine_activities
+    WHERE id = $1
+    `,
+      [id]
+    );
+
+    return routineActivity;
+  } catch (error) {
+    throw new Error("Failed to get routine activity by id " + error.message);
+  }
+}
+
 async function addActivityToRoutine({
   routineId,
   activityId,
@@ -20,62 +40,94 @@ async function addActivityToRoutine({
     );
     return routineActivity;
   } catch (error) {
-    throw new error;
+    throw new Error("Failed to add activity to routine " + error.message);
   }
 }
 
-async function getRoutineActivityById(id) {
-  const result = await client.query(
-    `
-    SELECT * FROM routine_activites
-    WHERE id = $1
-    `,
-    [id]
-  );
-
-  return result.rows[0];
-}
-
 async function getRoutineActivitiesByRoutine({ id }) {
-  const result = await client.query(
-    `
-    SELECT * FROM routine_activites
-    WHERE routineId = $1
+  try {
+    const { rows } = await client.query(
+      `
+    SELECT * 
+    FROM routine_activities
+    WHERE "routineId" = $1
     `,
-    [id]
-  );
+      [id]
+    );
 
-  return result.rows;
+    return rows;
+  } catch (error) {
+    throw new Error("Failed to get routine activity by routine " + error.message);
+  }
 }
 
-async function updateRoutineActivity({ id, count, duration }) {
-  const result = await client.query(
-    `
-    UPDATE routine_activites
-    SET count = $1, duration = $2
-    WHERE id = $3
-    RETURNING *
-    `,
-    [count, duration, id]
-  );
+async function updateRoutineActivity({ id, ...fields }) {
+  const fieldKeys = Object.keys(fields);
+  const fieldValues = Object.values(fields);
 
-  return result.rows[0];
+  const setString = fieldKeys
+    .map((key, index) => `"${key}"=$${index + 1}`)
+    .join(", ");
+
+  if (setString.length > 0) {
+    const query = {
+      text: `
+        UPDATE routine_activities
+        SET ${setString}
+        WHERE id=$${fieldKeys.length + 1}
+        RETURNING *;
+      `,
+      values: [...fieldValues, id],
+    };
+
+    try {
+      const {
+        rows: [routineActivity],
+      } = await client.query(query);
+      return routineActivity;
+    } catch (error) {
+      throw new Error("Failed to update routine activity: " + error.message);
+    }
+  }
 }
 
 async function destroyRoutineActivity(id) {
-  const result = await client.query(
-    `
-    DELETE FROM routine_activites
+  try {
+    const {
+      rows: [routineActivity],
+    } = await client.query(
+      `
+    DELETE FROM routine_activities
     WHERE id = $1
     RETURNING *
     `,
-    [id]
-  );
+      [id]
+    );
 
-  return result.rows[0];
+    return routineActivity;
+  } catch (error) {
+    throw new Error("Failed to destroy routine activity: " + error.message);
+  }
 }
 
-async function canEditRoutineActivity(routineActivityId, userId) {}
+async function canEditRoutineActivity(routineActivityId, userId) {
+  try {
+    const {
+      rows: [editableRoutineActivity],
+    } = await client.query(
+      `
+    SELECT routine_activities.*
+    FROM routine_activities
+    JOIN routines ON routines.id = routine_activities."routineId"
+    WHERE routines."creatorId" = $1 AND routine_activities.id = $2
+    `,
+      [userId, routineActivityId]
+    );
+    return editableRoutineActivity;
+  } catch (error) {
+    throw new Error("Failed to edit routine activity: " + error.message);
+  }
+}
 
 module.exports = {
   getRoutineActivityById,

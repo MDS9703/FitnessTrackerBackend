@@ -1,5 +1,5 @@
 const client = require("./client");
-const { attachActivitiesToRoutines, getActivityById } = require("./activities");
+const { connectActivitiesToRoutines } = require("./activities");
 
 async function createRoutine({ creatorId, isPublic, name, goal }) {
   try {
@@ -53,7 +53,7 @@ async function getAllRoutines() {
       JOIN users ON routines."creatorId"=users.id;`
     );
 
-    return attachActivitiesToRoutines(rows);
+    return connectActivitiesToRoutines(rows);
   } catch (error) {
     console.error(error);
   }
@@ -68,7 +68,7 @@ async function getAllPublicRoutines() {
       WHERE "isPublic"=true;`
     );
   
-    return attachActivitiesToRoutines(rows);
+    return connectActivitiesToRoutines(rows);
   } catch (error) {
     console.error(error);
   }
@@ -83,7 +83,7 @@ async function getAllRoutinesByUser({ username }) {
       WHERE "username"=$1;`
     , [username]);
   
-    return attachActivitiesToRoutines(rows);
+    return connectActivitiesToRoutines(rows);
   } catch (error) {
     console.error(error);
   }
@@ -98,7 +98,7 @@ async function getPublicRoutinesByUser({ username }) {
       WHERE "username"=$1 AND "isPublic"=true;`
     , [username]);
   
-    return attachActivitiesToRoutines(rows);
+    return connectActivitiesToRoutines(rows);
   } catch (error) {
     console.error(error);
   }
@@ -114,9 +114,25 @@ async function getPublicRoutinesByActivity({ id }) {
       (SELECT "routineId" FROM routine_activities WHERE "activityId"=${id});`
     );
   
-    return attachActivitiesToRoutines(rows);
+    return connectActivitiesToRoutines(rows);
   } catch (error) {
     console.error(error);
+  }
+}
+
+async function canEditRoutine(routineId, userId) {
+  try {
+    const { rows } = await client.query(
+      `
+      SELECT * FROM routines
+      WHERE id = $1 AND "creatorId" = $2;
+    `,
+      [routineId, userId]
+    );
+
+    return rows.length > 0;
+  } catch (error) {
+    console.log(error);
   }
 }
 
@@ -164,6 +180,7 @@ async function destroyRoutine(id) {
   }
 }
 
+
 module.exports = {
   getRoutineById,
   getRoutinesWithoutActivities,
@@ -175,4 +192,5 @@ module.exports = {
   createRoutine,
   updateRoutine,
   destroyRoutine,
+  canEditRoutine,
 };
