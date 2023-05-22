@@ -1,21 +1,19 @@
 import React, { useState } from "react";
 
-const UpdateRoutine = ({
-  routineId,
-  setRoutineId,
-  myRoutines,
-  setMyRoutines,
+const UpdateActivity = ({
+  activities,
+  setActivities,
+  activityId,
+  setActivityId,
 }) => {
   const [name, setName] = useState([]);
-  const [goal, setGoal] = useState([]);
+  const [description, setDescription] = useState([]);
   const token = localStorage.getItem("token");
+
   const handleSubmit = async (e) => {
     e.preventDefault();
-
-    console.log("name", name);
-    console.log("description", goal);
     const response = await fetch(
-      `http://fitnesstrac-kr.herokuapp.com/api/routines/${routineId}`,
+      `http://fitnesstrac-kr.herokuapp.com/api/activities/${activityId}`,
       {
         method: "PATCH",
         headers: {
@@ -23,8 +21,8 @@ const UpdateRoutine = ({
           Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
-          name: name,
-          goal: goal,
+          name,
+          description,
         }),
       }
     );
@@ -32,24 +30,23 @@ const UpdateRoutine = ({
     const data = await response.json();
 
     if (data && data.name) {
-      const newRoutines = myRoutines.map((routine) => {
-        if (routine.id === routineId) {
-          console.log(data);
+      const newActivities = activities.map((activity) => {
+        if (activity.id === activityId) {
           return data;
         } else {
-          return routine;
+          return activity;
         }
       });
-
-      setMyRoutines(newRoutines);
-
-      setRoutineId(null);
+      setActivities([...activities, newActivities]);
+      setName("");
+      setDescription("");
+      setActivityId(null);
     }
   };
 
   return (
     <>
-      <h3>Update my Routine</h3>
+      <h3>Update an Activity</h3>
       <form onSubmit={handleSubmit}>
         <input
           type="text"
@@ -60,9 +57,10 @@ const UpdateRoutine = ({
         <input
           type="text"
           placeholder="Description"
-          value={goal}
-          onChange={(e) => setGoal(e.target.value)}
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
         ></input>
+
         <button type="submit" className="btn">
           Submit
         </button>
@@ -71,4 +69,4 @@ const UpdateRoutine = ({
   );
 };
 
-export default UpdateRoutine;
+export default UpdateActivity;
